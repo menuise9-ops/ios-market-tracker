@@ -1,0 +1,18 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+
+# Runtime data (not source-controlled — this is user data, not code)
+data/app.db
+data/app.db-journal
+data/app.db-wal
+data/raw/*
+!data/raw/.gitkeep
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
