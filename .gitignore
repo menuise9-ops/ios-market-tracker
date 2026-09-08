@@ -13,6 +13,7 @@ build/
 data/app.db
 data/app.db-journal
 data/app.db-wal
+data/app.db-shm
 data/raw/*
 !data/raw/.gitkeep
 
