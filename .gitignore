@@ -1,6 +1,10 @@
 node_modules/
 dist/
 build/
+
+# Portable Node.js runtime downloaded locally so this machine (which had no
+# Node installed) can run the app — a dev-machine convenience, not source.
+.tools/
 *.log
 .env
 .env.local
