@@ -34,6 +34,9 @@ export default function App() {
   useEffect(() => {
     refreshConfig();
     refreshReviewCount();
+    const goToReview = () => setTab('review');
+    document.addEventListener('navigate-review', goToReview);
+    return () => document.removeEventListener('navigate-review', goToReview);
   }, []);
 
   if (!config) {

@@ -104,6 +104,15 @@ CREATE TABLE IF NOT EXISTS geocode_cache (
   resolved_at TEXT DEFAULT (datetime('now'))
 );
 
+-- CLAUDE.md §2: "once I confirm a few, you can raise confidence for that
+-- pattern going forward — but don't do this silently." A row here means the
+-- Review Queue confirmed that price-parsing pattern enough times that future
+-- imports stop flagging it (still shown, just no longer queued).
+CREATE TABLE IF NOT EXISTS pattern_confirmations (
+  reason_code TEXT PRIMARY KEY,
+  confirmed_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS app_config (
   key TEXT PRIMARY KEY,
   value TEXT

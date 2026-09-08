@@ -10,6 +10,11 @@ const multer = require('multer');
 const { db } = require('./db');
 const { importFile } = require('./importer');
 const { getOverview } = require('./overview');
+const { getVendors, mergeVendors } = require('./vendors');
+const { getVolume } = require('./volume');
+const { listReviewQueue, resolveReviewItem } = require('./reviewQueue');
+const { estimate } = require('./pricing');
+const { geocodeBatch } = require('./geocode');
 
 const app = express();
 app.use(cors());
@@ -107,6 +112,79 @@ app.post('/api/import', upload.single('file'), (req, res) => {
 
 app.get('/api/import-batches', (req, res) => {
   res.json(db.prepare('SELECT * FROM import_batches ORDER BY id DESC').all());
+});
+
+// ---------------------------------------------------------------------------
+// Vendor Tracker (§4C)
+// ---------------------------------------------------------------------------
+app.get('/api/vendors', (req, res) => {
+  res.json(getVendors());
+});
+
+app.post('/api/vendors/merge', (req, res) => {
+  const { fromName, intoName } = req.body;
+  if (!fromName || !intoName) return res.status(400).json({ error: 'fromName and intoName are required.' });
+  mergeVendors(fromName, intoName);
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Volume (§4D)
+// ---------------------------------------------------------------------------
+app.get('/api/volume', (req, res) => {
+  res.json(getVolume());
+});
+
+// ---------------------------------------------------------------------------
+// Review Queue (§4G)
+// ---------------------------------------------------------------------------
+app.get('/api/review-queue', (req, res) => {
+  res.json(listReviewQueue());
+});
+
+app.post('/api/review-queue/:sourceKey/resolve', (req, res) => {
+  try {
+    const result = resolveReviewItem(req.params.sourceKey, req.body || {});
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: String(err.message || err) });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Off-Market Pricing Tool (§4F)
+// ---------------------------------------------------------------------------
+app.get('/api/pricing-estimate', (req, res) => {
+  const { market, municipality, type, acres, sqft } = req.query;
+  if (!market || !type) return res.status(400).json({ error: 'market and type are required.' });
+  res.json(
+    estimate({
+      market,
+      municipality: municipality || null,
+      type,
+      acres: acres ? parseFloat(acres) : null,
+      sqft: sqft ? parseFloat(sqft) : null,
+    })
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Cluster Map (§4E)
+// ---------------------------------------------------------------------------
+app.get('/api/map-points', (req, res) => {
+  const rows = db.prepare('SELECT * FROM listings WHERE lat IS NOT NULL AND lon IS NOT NULL').all();
+  const ungeocoded = db.prepare('SELECT COUNT(*) as n FROM listings WHERE lat IS NULL').get().n;
+  res.json({ points: rows, ungeocodedRemaining: ungeocoded });
+});
+
+app.post('/api/geocode/run', async (req, res) => {
+  const limit = req.body?.limit || 20;
+  try {
+    const result = await geocodeBatch(limit);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: String(err.message || err) });
+  }
 });
 
 // ---------------------------------------------------------------------------

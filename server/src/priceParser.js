@@ -97,6 +97,7 @@ function parsePrice(rawValue, rowContext = {}) {
     basis: 'unspecified',
     confidence: 'high',
     reviewReason: null,
+    reasonCode: null,
   };
 
   if (trimmed === '' || /^fill in price$/i.test(trimmed) || /^n\/?a$/i.test(trimmed)) {
@@ -118,6 +119,7 @@ function parsePrice(rawValue, rowContext = {}) {
       reviewReason: amount !== null
         ? 'Sale price suppressed; amount shown is the ASKING/list price, not a confirmed sale price.'
         : 'Sale price suppressed with no list price disclosed.',
+      reasonCode: amount !== null ? 'suppressed_with_list' : 'suppressed_no_list',
     };
   }
 
@@ -145,6 +147,7 @@ function parsePrice(rawValue, rowContext = {}) {
     const dealType = unitBasis.unit ? 'lease' : (amount !== null && amount > PRICE_PARSER_CONFIG.bareNumberSaleFloor ? 'sale' : 'lease');
 
     let reviewReason = null;
+    let reasonCode = null;
     let status = 'parsed';
 
     // "$41,000 Net" — net basis but no per-SF/month/year unit given: monthly vs
@@ -152,16 +155,19 @@ function parsePrice(rawValue, rowContext = {}) {
     if (unitBasis.basis === 'net' && !unitBasis.unit) {
       status = 'needs_review';
       reviewReason = 'Net lease amount given with no unit (per SF / per month / per year) — basis is ambiguous.';
+      reasonCode = 'net_no_unit';
     }
     // "$5,500 Gross" with no unit — likely per-month, but flag for confirmation.
     if (unitBasis.basis === 'gross' && !unitBasis.unit) {
       status = 'needs_review';
       reviewReason = 'Gross lease amount given with no unit — assumed per-month, please confirm.';
+      reasonCode = 'gross_no_unit';
     }
     // "$19/ft" — per-SF unit but basis (net vs gross) unstated.
     if (unitBasis.unit === 'per_sf' && unitBasis.basis === 'unspecified') {
       status = 'needs_review';
       reviewReason = 'Per-SF lease rate with no net/gross basis stated.';
+      reasonCode = 'per_sf_no_basis';
     }
 
     return {
@@ -173,6 +179,7 @@ function parsePrice(rawValue, rowContext = {}) {
       basis: unitBasis.basis,
       confidence: 'high',
       reviewReason,
+      reasonCode,
     };
   }
 
@@ -189,6 +196,7 @@ function parsePrice(rawValue, rowContext = {}) {
         basis: 'unspecified',
         confidence: 'low',
         reviewReason: `Bare number > ${PRICE_PARSER_CONFIG.bareNumberSaleFloor.toLocaleString()} with no currency/unit suffix — assumed total sale price.`,
+        reasonCode: 'bare_large_number_sale',
       };
     }
     if (bare < PRICE_PARSER_CONFIG.bareNumberLeaseCeiling && (rowContext.sqft || rowContext.acres)) {
@@ -201,6 +209,7 @@ function parsePrice(rawValue, rowContext = {}) {
         basis: 'unspecified',
         confidence: 'low',
         reviewReason: `Bare number < ${PRICE_PARSER_CONFIG.bareNumberLeaseCeiling} with no suffix — assumed $/SF lease rate.`,
+        reasonCode: 'bare_small_number_lease',
       };
     }
     // In the dead zone between the two thresholds, or no sqft/acres context to
@@ -214,6 +223,7 @@ function parsePrice(rawValue, rowContext = {}) {
       basis: 'unspecified',
       confidence: 'low',
       reviewReason: 'Bare number with no suffix and no clear size context — could not confidently classify as sale price or lease rate.',
+      reasonCode: 'bare_number_ambiguous',
     };
   }
 
@@ -223,6 +233,7 @@ function parsePrice(rawValue, rowContext = {}) {
     status: 'needs_review',
     confidence: 'low',
     reviewReason: `Unrecognized price format: "${rawOriginal}".`,
+    reasonCode: 'unrecognized_price_format',
   };
 }
 

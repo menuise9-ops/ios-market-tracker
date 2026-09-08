@@ -28,7 +28,7 @@ for (const f of files) {
   if (summary.flaggedRows.length) {
     console.log('  flagged rows:');
     for (const r of summary.flaggedRows) {
-      console.log(`    - ${r.address}: ${r.reasons.join(' | ')}`);
+      console.log(`    - ${r.address}: ${r.reasons.map((x) => x.text).join(' | ')}`);
     }
   }
 }

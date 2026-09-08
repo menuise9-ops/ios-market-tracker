@@ -233,6 +233,10 @@ function importFile(filePath) {
   const archivedPath = archiveRawFile(filePath);
   const workbook = XLSX.readFile(filePath, { cellDates: true, sheetStubs: false });
 
+  const confirmedPatterns = new Set(
+    db.prepare('SELECT reason_code FROM pattern_confirmations').all().map((r) => r.reason_code)
+  );
+
   const insertBatch = db.prepare(
     `INSERT INTO import_batches (filename, archived_path) VALUES (?, ?)`
   );
@@ -316,7 +320,12 @@ function importFile(filePath) {
       const coveragePct = parseCoveragePct(cell(row, colMap.coveragePct));
       const dateInfo = parseDateField(cell(row, colMap.date));
       const priceRaw = cell(row, colMap.price);
-      const priceInfo = parsePrice(priceRaw, { sqft: sqftInfo.value, acres: acresInfo.value });
+      let priceInfo = parsePrice(priceRaw, { sqft: sqftInfo.value, acres: acresInfo.value });
+      if (priceInfo.status === 'needs_review' && priceInfo.reasonCode && confirmedPatterns.has(priceInfo.reasonCode)) {
+        // This exact ambiguous pattern has been confirmed enough times via the
+        // Review Queue — keep the same inferred amount/unit, stop flagging it.
+        priceInfo = { ...priceInfo, status: 'parsed', confidence: 'high', reviewReason: null };
+      }
       const taxesRaw = cell(row, colMap.taxes);
       const taxesNumeric = parseTaxesNumeric(taxesRaw);
       const zoning = cell(row, colMap.zoning);
@@ -326,18 +335,18 @@ function importFile(filePath) {
 
       const reviewReasons = [];
       if (typeInfo.normalized === null && typeInfo.raw) {
-        reviewReasons.push(`Unrecognized Type of Land value: "${typeInfo.raw}".`);
+        reviewReasons.push({ code: 'unrecognized_type_of_land', text: `Unrecognized Type of Land value: "${typeInfo.raw}".` });
       }
       if (dateInfo.flagged) {
-        reviewReasons.push(`Date looks wrong (parsed year out of sane range): "${dateInfo.raw}".`);
+        reviewReasons.push({ code: 'date_out_of_range', text: `Date looks wrong (parsed year out of sane range): "${dateInfo.raw}".` });
       }
       if (priceInfo.status === 'needs_review') {
-        reviewReasons.push(priceInfo.reviewReason);
+        reviewReasons.push({ code: priceInfo.reasonCode, text: priceInfo.reviewReason });
       }
 
       const baseKeyRaw = computeBaseKeyRaw(market, recordType, address, municipality, typeInfo.normalized);
       const match = resolveMatch(recordType, baseKeyRaw, dateInfo.iso, priceInfo.amount);
-      if (match.flagReason) reviewReasons.push(match.flagReason);
+      if (match.flagReason) reviewReasons.push({ code: 'possible_resale', text: match.flagReason });
 
       let rowObj = {
         source_key: match.sourceKey,
