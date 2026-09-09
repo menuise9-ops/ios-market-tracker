@@ -113,6 +113,15 @@ CREATE TABLE IF NOT EXISTS pattern_confirmations (
   confirmed_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Cached Bank of Canada overnight rate observations (see rates.js). This is
+-- the one place the app calls out to the internet for something other than
+-- geocoding — cached so a later offline run still has whatever was fetched.
+CREATE TABLE IF NOT EXISTS boc_rates (
+  date TEXT PRIMARY KEY,
+  overnight_rate REAL,
+  fetched_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS app_config (
   key TEXT PRIMARY KEY,
   value TEXT
@@ -120,6 +129,18 @@ CREATE TABLE IF NOT EXISTS app_config (
 `;
 
 db.exec(SCHEMA);
+
+// Lightweight column migrations — SQLite's ALTER TABLE ADD COLUMN has no
+// IF NOT EXISTS, so check pragma table_info first to stay idempotent across
+// restarts (no separate migration framework for a single-table app like this).
+function ensureColumn(table, column, ddl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  if (!cols.includes(column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+  }
+}
+ensureColumn('listings', 'geocode_precision', 'TEXT');
+ensureColumn('listings', 'geocode_attempted', 'INTEGER DEFAULT 0');
 
 // Seed the region-label config once, with defaults the onboarding screen can
 // override (CLAUDE.md §1: "confirm these expansions with me ... rather than

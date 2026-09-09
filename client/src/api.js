@@ -19,6 +19,8 @@ async function req(path, options) {
 
 export const api = {
   getConfig: () => req('/config'),
+  getPulse: () => req('/pulse'),
+  getTrends: (months) => req(`/trends${months ? `?months=${months}` : ''}`),
   saveMarketLabels: (labels, confirmed) =>
     req('/config/market-labels', {
       method: 'POST',

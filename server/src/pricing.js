@@ -40,7 +40,10 @@ function weightedAvg(items, valueFn, weightFn) {
 }
 
 function getLatestDate() {
-  const row = db.prepare('SELECT MAX(record_date) as d FROM listings').get();
+  // Exclude date_flagged rows (e.g. the known "2206" instead of "2026" typo,
+  // see CLAUDE.md §1) — a bad future date would otherwise poison recency
+  // weighting for every comp in the dataset.
+  const row = db.prepare("SELECT MAX(record_date) as d FROM listings WHERE date_flagged = 0").get();
   return row?.d || new Date().toISOString().slice(0, 10);
 }
 

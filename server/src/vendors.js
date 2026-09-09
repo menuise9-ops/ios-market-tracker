@@ -75,12 +75,24 @@ function getVendors() {
         market: d.market,
         date: d.record_date,
         price: d.price_amount,
+        priceUnit: d.price_unit,
         priceRaw: d.price_raw,
         sourceKey: d.source_key,
       })),
     });
   }
   vendors.sort((a, b) => b.dealCount - a.dealCount || b.totalVolume - a.totalVolume);
+
+  // Market concentration (HHI-style, on $ volume) — answers "is this market
+  // fractured or dominated by a few sellers?" HHI is the sum of squared
+  // market shares (0-10000 scale); <1500 = fragmented, 1500-2500 = moderate,
+  // >2500 = concentrated (US DOJ/FTC's own thresholds, reused here since
+  // there's no CRE-specific convention worth inventing).
+  const totalVolumeAll = vendors.reduce((s, v) => s + v.totalVolume, 0);
+  const hhi = totalVolumeAll > 0
+    ? vendors.reduce((s, v) => s + Math.pow((v.totalVolume / totalVolumeAll) * 100, 2), 0)
+    : 0;
+  const concentration = hhi > 2500 ? 'concentrated' : hhi > 1500 ? 'moderate' : 'fragmented';
 
   // Possible-same-entity suggestions among *unmerged* vendor names.
   const names = vendors.map((v) => v.vendorName);
@@ -97,7 +109,7 @@ function getVendors() {
     }
   }
 
-  return { vendors, suggestions };
+  return { vendors, suggestions, concentration: { hhi: Math.round(hhi), label: concentration, totalVolumeAll } };
 }
 
 function mergeVendors(fromName, intoName) {

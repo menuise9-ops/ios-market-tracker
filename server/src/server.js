@@ -14,7 +14,10 @@ const { getVendors, mergeVendors } = require('./vendors');
 const { getVolume } = require('./volume');
 const { listReviewQueue, resolveReviewItem } = require('./reviewQueue');
 const { estimate } = require('./pricing');
-const { geocodeBatch } = require('./geocode');
+const { geocodeBatch, ensureBackgroundGeocoding } = require('./geocode');
+const { getPulse } = require('./pulse');
+const { getTrends } = require('./trends');
+const { refreshIfStale } = require('./rates');
 
 const app = express();
 app.use(cors());
@@ -104,6 +107,7 @@ app.post('/api/import', upload.single('file'), (req, res) => {
     const summary = importFile(renamedPath);
     fs.unlinkSync(renamedPath);
     res.json(summary);
+    ensureBackgroundGeocoding(); // fire-and-forget, after responding
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err.message || err) });
@@ -173,8 +177,9 @@ app.get('/api/pricing-estimate', (req, res) => {
 // ---------------------------------------------------------------------------
 app.get('/api/map-points', (req, res) => {
   const rows = db.prepare('SELECT * FROM listings WHERE lat IS NOT NULL AND lon IS NOT NULL').all();
-  const ungeocoded = db.prepare('SELECT COUNT(*) as n FROM listings WHERE lat IS NULL').get().n;
-  res.json({ points: rows, ungeocodedRemaining: ungeocoded });
+  const ungeocoded = db.prepare('SELECT COUNT(*) as n FROM listings WHERE lat IS NULL AND geocode_attempted = 0').get().n;
+  const permanentlyFailed = db.prepare('SELECT COUNT(*) as n FROM listings WHERE lat IS NULL AND geocode_attempted = 1').get().n;
+  res.json({ points: rows, ungeocodedRemaining: ungeocoded, permanentlyFailed });
 });
 
 app.post('/api/geocode/run', async (req, res) => {
@@ -188,9 +193,30 @@ app.post('/api/geocode/run', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Market Pulse (institutional-style home screen — KPIs, trends, insights,
+// recent activity, all computed fresh from the same listings table)
+// ---------------------------------------------------------------------------
+app.get('/api/pulse', (req, res) => {
+  res.json(getPulse());
+});
+
+// ---------------------------------------------------------------------------
+// Pricing Trends over time, with BoC overnight-rate overlay
+// ---------------------------------------------------------------------------
+app.get('/api/trends', (req, res) => {
+  const months = req.query.months ? parseInt(req.query.months, 10) : 12;
+  res.json(getTrends(months));
+});
+
+// ---------------------------------------------------------------------------
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`IOS Tracker API listening on http://localhost:${PORT}`);
+  ensureBackgroundGeocoding(); // catch up on anything left ungeocoded from last run
+  refreshIfStale().then((r) => {
+    if (r.refreshed) console.log(`Refreshed Bank of Canada rate series (${r.count} observations).`);
+    else if (r.error) console.error('Could not refresh BoC rate series (offline?):', r.error);
+  });
 });
 
 module.exports = app;
