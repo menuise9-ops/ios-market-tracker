@@ -2,16 +2,27 @@ import streamlit as st
 
 from lib.overview import get_overview, MARKETS, TYPES
 from lib import db
-from lib.fmt import fmt_money
+from lib.fmt import fmt_money, esc_md
+
+STAT_ROWS = [
+    ("Avg sale price", "avg_sale_price"),
+    ("Avg $/SF net", "avg_lease_sf_net"),
+    ("Avg $/SF gross", "avg_lease_sf_gross"),
+    ("Avg $/acre", "avg_per_acre"),
+]
 
 
 def _metric_line(label, stat):
-    if not stat or stat["n"] == 0:
-        st.caption(f"{label}: *no comps (n=0)*")
-        return
+    """Note: money values go through esc_md() before hitting st.markdown —
+    Streamlit auto-renders `$...$` as LaTeX whenever two dollar signs end up
+    flush against non-space text (which four dollar-formatted numbers on
+    one line does constantly), so an un-escaped '$' here silently mangles
+    the whole card into stray tag text. See lib/fmt.py for the full story.
+    """
     st.markdown(
-        f"<span style='color:#64748b'>{label}:</span> <b>{fmt_money(stat['avg'])}</b> "
-        f"<span style='color:#94a3b8;font-size:12px'>(n={stat['n']}, {fmt_money(stat['min'])}–{fmt_money(stat['max'])})</span>",
+        f"<span style='color:#64748b;font-size:13px'>{esc_md(label)}</span><br>"
+        f"<b style='font-size:15px'>{esc_md(fmt_money(stat['avg']))}</b> "
+        f"<span style='color:#94a3b8;font-size:12px'>(n={stat['n']}, {esc_md(fmt_money(stat['min']))}–{esc_md(fmt_money(stat['max']))})</span>",
         unsafe_allow_html=True,
     )
 
@@ -41,19 +52,26 @@ def render(config):
     )
 
     show_markets = MARKETS if market == "All" else [market]
-    idx = 0
-    n_cols = 4
+    n_cols = min(4, max(1, len(show_markets) * len(TYPES)))
     grid = st.columns(n_cols)
+    idx = 0
     for mkt in show_markets:
         for typ in TYPES:
             with grid[idx % n_cols]:
                 with st.container(border=True):
                     st.markdown(f"**{labels.get(mkt, mkt)}** <span style='color:#94a3b8'>· {typ}</span>", unsafe_allow_html=True)
-                    for status, title in [("available", "AVAILABLE"), ("sold", "SOLD")]:
+                    for status, title in [("available", "Available"), ("sold", "Sold")]:
                         cell = data["cells"][f"{mkt}|{typ}|{status}"]
-                        st.markdown(f"<div style='font-size:11px;font-weight:600;color:#64748b;margin-top:8px'>{title} ({cell['total_listings']})</div>", unsafe_allow_html=True)
-                        _metric_line("Avg sale price", cell["avg_sale_price"])
-                        _metric_line("Avg $/SF net", cell["avg_lease_sf_net"])
-                        _metric_line("Avg $/SF gross", cell["avg_lease_sf_gross"])
-                        _metric_line("Avg $/acre", cell["avg_per_acre"])
+                        st.markdown(
+                            f"<div style='font-size:11px;font-weight:600;color:#64748b;"
+                            f"text-transform:uppercase;margin-top:10px;border-top:1px solid #f1f5f9;padding-top:6px'>"
+                            f"{title} · {cell['total_listings']} listing(s)</div>",
+                            unsafe_allow_html=True,
+                        )
+                        rows_with_data = [(label, cell[key]) for label, key in STAT_ROWS if cell[key]["n"] > 0]
+                        if not rows_with_data:
+                            st.caption("No comps yet.")
+                            continue
+                        for label, stat in rows_with_data:
+                            _metric_line(label, stat)
             idx += 1

@@ -2,7 +2,7 @@ import streamlit as st
 
 from lib.pricing import estimate
 from lib import db
-from lib.fmt import fmt_money
+from lib.fmt import fmt_money, esc_md
 
 
 def render(config):
@@ -37,7 +37,7 @@ def render(config):
         st.metric("Estimate", fmt_money(result["sale"]["estimate"]))
         st.write(f"Avg total (all comps): **{fmt_money(result['sale']['avg_total'])}**")
         st.write(f"Avg $/acre: **{fmt_money(result['sale']['avg_per_acre'])}**")
-        st.write(f"Range: **{fmt_money(result['sale']['min'])} – {fmt_money(result['sale']['max'])}**")
+        st.write(f"Range: **{esc_md(fmt_money(result['sale']['min']))} – {esc_md(fmt_money(result['sale']['max']))}**")
     with c2, st.container(border=True):
         st.markdown("**Lease scenario**")
         st.caption(f"n = {result['lease']['n']} comp(s), recent-weighted (3-month half-life)")

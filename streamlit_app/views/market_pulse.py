@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 
 from lib.pulse import get_pulse
-from lib.fmt import fmt_money, fmt_price_cell
+from lib.fmt import fmt_money, fmt_price_cell, esc_md
 
 SEVERITY_COLOR = {"high": "#dc2626", "medium": "#d97706", "info": "#2563eb"}
 INSIGHT_LABEL = {
@@ -47,7 +47,7 @@ def render(config):
             border-left-width:3px;border-radius:6px;padding:10px 14px;margin-bottom:6px;display:flex;gap:12px;">
             <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;
             color:#94a3b8;width:90px;flex-shrink:0;padding-top:2px;">{label}</span>
-            <span style="color:#334155;font-size:14px;">{ins['text']}</span></div>""",
+            <span style="color:#334155;font-size:14px;">{esc_md(ins['text'])}</span></div>""",
             unsafe_allow_html=True,
         )
 
