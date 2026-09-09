@@ -17,6 +17,19 @@ data/app.db-shm
 data/raw/*
 !data/raw/.gitkeep
 
+# Streamlit app: same rule, but seed.db (a deliberate committed snapshot
+# the deployed app boots from) is the one exception — see lib/db.py.
+streamlit_app/data/app.db
+streamlit_app/data/app.db-journal
+streamlit_app/data/app.db-wal
+streamlit_app/data/app.db-shm
+streamlit_app/data/raw/*
+!streamlit_app/data/raw/.gitkeep
+__pycache__/
+*.pyc
+.venv/
+venv/
+
 # OS/editor
 .DS_Store
 Thumbs.db

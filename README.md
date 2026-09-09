@@ -3,7 +3,15 @@
 Local dashboard for tracking biweekly Industrial Outdoor Storage (IOS) market reports.
 See [`CLAUDE.md`](./CLAUDE.md) for the full project brief this was built against.
 
-## Running it
+**Two implementations of the same brief live in this repo:**
+- `server/` + `client/` — the original Node/Express + React app, below.
+- [`streamlit_app/`](./streamlit_app/) — a Python/Streamlit port with the same data
+  model and feature set, built so it can be deployed to Streamlit Community Cloud
+  for a persistent URL that doesn't depend on this machine or a chat session staying
+  around. See its own [README](./streamlit_app/README.md) for deploy steps and an
+  important note on data persistence there.
+
+## Running it (Node/React version)
 
 This machine didn't have Node.js installed, so a portable copy lives in `.tools/`
 (gitignored — it's a dev-machine convenience, not part of the app). Every command
